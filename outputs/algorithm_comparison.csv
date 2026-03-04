@@ -1,0 +1,9 @@
+Solution,LFW Accuracy,Speed (CPU),Embedding Dim,Cost,Ease of Use,Low-Res Perf,Recommended
+InsightFace (ArcFace),99.83%,Fast,512,Free,Medium,★★★★★,✅ YES
+DeepFace (ArcFace),99.64%,Slow,512,Free,Easy,★★★★,⚡ OK
+DeepFace (Facenet512),99.65%,Slow,512,Free,Easy,★★★★,⚡ OK
+DeepFace (VGG-Face),98.78%,Slow,4096,Free,Easy,★★★,❌ No
+Dlib ResNet,99.38%,Medium,128,Free,Medium,★★★,⚠️ OK
+face_recognition lib,99.38%,Medium,128,Free,Very Easy,★★★,❌ No
+AWS Rekognition,~99.5%,API,N/A,Paid,Easy,★★★★,💰 Costly
+Azure Face API,~99.5%,API,N/A,Paid,Easy,★★★★,💰 Costly
