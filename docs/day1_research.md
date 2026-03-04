@@ -1,8 +1,6 @@
 # Day 1 Research — Face Recognition Pipeline
 
 **Date:** 2026-03-04  
-**Status:** ✅ Complete  
-**Researcher:** fakubwoy
 
 ---
 
@@ -81,7 +79,7 @@ User uploads query photo
 - **Accuracy:** Best-in-class, handles occlusion and pose well
 - **Speed:** ~15–20 FPS CPU with ONNX runtime
 - **Low-res:** Handles 20×20 pixel faces with `det_size=(640,640)`
-- **Verdict:** ✅ Recommended for production
+- **Verdict:**  Recommended for production
 
 #### YOLOv8-Face
 - Adapted from YOLOv8 object detector
@@ -98,13 +96,14 @@ User uploads query photo
 
 ### Detection Comparison Table
 
-| Detector | Accuracy | CPU Speed | Low-Res | Landmarks | Recommended |
-|----------|----------|-----------|---------|-----------|-------------|
-| RetinaFace | ★★★★★ | 15–20 FPS | ★★★★★ | 5-point + 3D | ✅ Yes |
-| MTCNN | ★★★★ | 8–12 FPS | ★★★ | 5-point | ⚠️ Legacy |
-| YOLOv8-Face | ★★★★★ | 30+ FPS | ★★★★ | 5-point | ✅ GPU use |
-| Dlib HOG | ★★★ | 20 FPS | ★★ | None | ❌ No |
-| OpenCV Haar | ★★ | 50+ FPS | ★ | None | ❌ Baseline only |
+| Detector    | Accuracy  | CPU Speed           | Low-Res   | Landmarks    | Recommended   |
+| ----------- | --------- | ------------------- | --------- | ------------ | ------------- |
+| RetinaFace  | Excellent | Fast (15–20 FPS)    | Excellent | 5-point + 3D | Yes           |
+| MTCNN       | Very Good | Moderate (8–12 FPS) | Good      | 5-point      | Legacy        |
+| YOLOv8-Face | Excellent | Very Fast (30+ FPS) | Very Good | 5-point      | GPU use       |
+| Dlib HOG    | Average   | Fast (20 FPS)       | Poor      | None         | No            |
+| OpenCV Haar | Poor      | Very Fast (50+ FPS) | Very Poor | None         | Baseline only |
+
 
 ---
 
@@ -136,13 +135,14 @@ User uploads query photo
 
 ### Embedding Model Comparison
 
-| Model | LFW Accuracy | Embedding Dim | Speed (CPU) | Low-Res | Size |
-|-------|-------------|---------------|-------------|---------|------|
-| ArcFace (w600k_r50) | **99.83%** | 512 | Fast | ★★★★★ | 170MB |
-| Facenet512 | 99.65% | 512 | Medium | ★★★★ | 90MB |
-| FaceNet128 | 99.63% | 128 | Fast | ★★★★ | 90MB |
-| VGG-Face | 98.78% | 4096 | Slow | ★★★ | 550MB |
-| Dlib ResNet | 99.38% | 128 | Medium | ★★★ | 22MB |
+| Model               | LFW Accuracy | Embedding Dim | Speed (CPU) | Low-Res   | Size  |
+| ------------------- | ------------ | ------------- | ----------- | --------- | ----- |
+| ArcFace (w600k_r50) | **99.83%**   | 512           | Fast        | Excellent | 170MB |
+| Facenet512          | 99.65%       | 512           | Medium      | Very Good | 90MB  |
+| FaceNet128          | 99.63%       | 128           | Fast        | Very Good | 90MB  |
+| VGG-Face            | 98.78%       | 4096          | Slow        | Average   | 550MB |
+| Dlib ResNet         | 99.38%       | 128           | Medium      | Average   | 22MB  |
+
 
 ---
 
@@ -154,7 +154,7 @@ User uploads query photo
 - ONNX runtime enables fast CPU inference without PyTorch
 - Models auto-download on first run (~300MB total)
 - Python API: `FaceAnalysis().get(img)` returns faces with `.normed_embedding`
-- **Tested:** ✅ Working — 16,058 embeddings extracted from LFW at 3.4 emb/sec CPU
+- **Tested:**  Working — 16,058 embeddings extracted from LFW at 3.4 emb/sec CPU
 
 ### DeepFace
 - Excellent for research and quick comparisons
@@ -189,7 +189,7 @@ is still fast, but at 100k+ we need indexing.
 ### FAISS (Facebook AI Similarity Search)
 - **Chosen for this project**
 - `IndexFlatIP` — exact cosine search, no approximation
-- Search 16,058 vectors in <1ms on CPU
+- Search 16,058 vectors in < 1ms on CPU
 - `IndexIVFFlat` or `IndexHNSWFlat` — approximate, needed at 100k+
 
 ### Other Options Researched
@@ -239,7 +239,7 @@ Score of 1.0 = exact image match. Score >0.7 generally indicates same person wit
 | Embedding throughput | 3.4 embeddings/sec |
 | Total embeddings built | 16,058 |
 | Index build time | ~79 minutes |
-| Search latency | <5ms per query |
+| Search latency | < 5ms per query |
 | Index size on disk | ~32MB |
 
 ---
