@@ -60,3 +60,16 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# Model weights — large binary files, auto-downloaded on first run
+models/
+
+# Day 2 evaluation results — generated data, not source code
+src/day2/results/
+
+# Day 1 generated outputs
+embeddings/
+outputs/
+
+# Dataset — too large for git (~200MB+)
+datasets/

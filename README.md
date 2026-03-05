@@ -19,26 +19,55 @@ Design and prototype a system that can:
 face-recognition-research/
 ├── datasets/
 │   └── lfw_home/
-│       └── lfw_funneled/          ← LFW dataset (5,749 people, 13,233 images)
+│       └── lfw_funneled/               ← LFW dataset (5,749 people, 13,233 images)
 │           └── <Person_Name>/
 │               └── *.jpg
+│
 ├── embeddings/
-│   ├── face_index.faiss           ← FAISS vector index (16,058 embeddings)
-│   ├── metadata.pkl               ← Per-embedding metadata (path, label, bbox)
-│   └── embeddings.npy             ← Raw embedding matrix (float32)
+│   ├── face_index.faiss                ← FAISS vector index (16,058 embeddings)
+│   ├── metadata.pkl                    ← Per-embedding metadata (path, label, bbox)
+│   └── embeddings.npy                  ← Raw embedding matrix (float32)
+│
 ├── outputs/
-│   ├── search_result.png          ← Visual output of last query
-│   └── algorithm_comparison.png  ← Day 1 benchmark charts
+│   ├── search_result.png               ← Visual output of last query
+│   ├── algorithm_comparison.png        ← Day 1 benchmark charts
+│   └── algorithm_comparison.csv        ← Day 1 comparison table
+│
+├── models/                             ← Downloaded model weight files
+│   ├── shape_predictor_68_face_landmarks.dat
+│   └── dlib_face_recognition_resnet_model_v1.dat
+│
 ├── src/
 │   ├── __init__.py
-│   ├── detect.py                  ← Face detector benchmarking
-│   ├── embed.py                   ← Embedding generation + FAISS index builder
-│   ├── search.py                  ← Query a face against the index
-│   ├── compare_algorithms.py      ← Algorithm comparison + chart generation
-│   └── utils.py                   ← Shared helpers
-├── notebooks/                     ← Jupyter notebooks (exploratory)
-├── docs/                          ← Research documentation
-├── demo.py                        ← End-to-end pipeline demo (single file)
+│   ├── detect.py                       ← Face detector benchmarking (Day 1)
+│   ├── embed.py                        ← Embedding generation + FAISS builder (Day 1)
+│   ├── search.py                       ← Query face against index (Day 1)
+│   ├── compare_algorithms.py           ← Algorithm comparison + charts (Day 1)
+│   ├── utils.py                        ← Shared helpers
+│   │
+│   └── day2/                           ← Day 2 evaluation scripts
+│       ├── run_all.py                  ← Master runner (start here)
+│       ├── eval_lfw_pairs.py           ← Task 1: LFW pairs benchmark
+│       ├── eval_lowres.py              ← Task 2: low-res degradation test
+│       ├── eval_occlusion.py           ← Task 3: occlusion robustness
+│       ├── eval_deepface_backends.py   ← Task 4: DeepFace model comparison
+│       ├── eval_proprietary_apis.py    ← Task 5: AWS + Azure eval
+│       ├── collect_results.py          ← Merges all JSONs → day2_full_results.json
+│       ├── README.md                   ← Day 2 run instructions
+│       └── results/                    ← All Day 2 JSON outputs land here
+│           ├── lfw_pairs_results.json
+│           ├── lowres_results.json
+│           ├── occlusion_results.json
+│           ├── deepface_backends.json
+│           ├── proprietary_api_results.json
+│           └── day2_full_results.json  ← Merged output (paste to Claude for report)
+│
+├── docs/
+│   ├── day1_research.md                ← Day 1: algorithm research & findings
+│   └── day2_research.md                ← Day 2: framework evaluation report
+│
+├── notebooks/                          ← Jupyter notebooks (exploratory)
+├── demo.py                             ← End-to-end pipeline demo (single file)
 ├── requirements.txt
 └── README.md
 ```
@@ -61,7 +90,6 @@ pip install -r requirements.txt
 ### 2. Download the LFW dataset
 
 ```bash
-# Via scikit-learn (automatic, ~200MB)
 python3 -c "
 from sklearn.datasets import fetch_lfw_people
 fetch_lfw_people(min_faces_per_person=1, download_if_missing=True, data_home='datasets')
@@ -108,7 +136,17 @@ QUERY=$(ls datasets/lfw_home/lfw_funneled/$PERSON/*.jpg | head -1)
 python3 demo.py datasets/lfw_home/lfw_funneled "$QUERY"
 ```
 
-### 6. Run algorithm comparison + generate charts
+### 6. Run Day 2 evaluation suite
+
+```bash
+# From project root:
+python3 src/day2/run_all.py            # full run (~90–170 min)
+python3 src/day2/run_all.py --quick    # reduced pairs (~30 min)
+
+# Results land in src/day2/results/day2_full_results.json
+```
+
+### 7. Run algorithm comparison + generate charts
 
 ```bash
 python3 src/compare_algorithms.py
@@ -130,13 +168,21 @@ python3 src/compare_algorithms.py
 
 ---
 
-##  Key Results (Day 1)
+##  Key Results
 
+### Day 1
 - **16,058** face embeddings extracted from LFW dataset
 - **3.4 embeddings/sec** on CPU (no GPU)
 - **Cosine similarity score of 1.000** for exact match (same image)
 - **0.84+ similarity** for other photos of the same person
 - Index size: ~32MB on disk (512 × 16058 × 4 bytes)
+
+### Day 2
+- **DeepFace Facenet512** — best measured accuracy at **98.67%** on LFW pairs
+- **DeepFace ArcFace** — fastest DeepFace backend at **1.67 pairs/sec**
+- **Low-res robustness** — accuracy degrades from 90.67% → 85.33% at 64×64px (−5.3%)
+- **Occlusion** — 100% detection rate maintained across eyes, lower face, and random patch blocks
+- **InsightFace** — detection blocked by in-memory image pipeline issue (see docs/day2_research.md §8.1)
 
 ---
 
@@ -145,7 +191,7 @@ python3 src/compare_algorithms.py
 | Day | Focus | Status |
 |-----|-------|--------|
 | 1 | Algorithm research + prototype pipeline |  Done |
-| 2 | Framework evaluation (InsightFace vs DeepFace vs Dlib) |  Next |
+| 2 | Framework evaluation (InsightFace vs DeepFace vs Dlib) |  Done |
 | 3 | Storage strategy + vector DB research |  Upcoming |
 | 4 | Cost estimation + final recommendations |  Upcoming |
 
@@ -155,17 +201,16 @@ python3 src/compare_algorithms.py
 
 See `docs/` for:
 - `day1_research.md` — Algorithm comparison, findings, and architecture decisions
-- Architecture diagrams (coming Day 3)
+- `day2_research.md` — Framework evaluation, low-res + occlusion test results
 
 ---
 
 ##  Dataset
 
-**LFW (Labeled Faces in the Wild)** — University of Massachusetts  
+**LFW (Labeled Faces in the Wild)** — University of Massachusetts
 - 13,233 images of 5,749 people
 - Collected from news articles
 - Standard benchmark for face verification
 - [Official site](http://vis-www.cs.umass.edu/lfw/)
 
 ---
-
