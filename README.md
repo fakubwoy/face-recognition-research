@@ -45,26 +45,34 @@ face-recognition-research/
 │   ├── compare_algorithms.py           ← Algorithm comparison + charts (Day 1)
 │   ├── utils.py                        ← Shared helpers
 │   │
-│   └── day2/                           ← Day 2 evaluation scripts
+│   ├── day2/                           ← Day 2 evaluation scripts
+│   │   ├── run_all.py
+│   │   ├── eval_lfw_pairs.py
+│   │   ├── eval_lowres.py
+│   │   ├── eval_occlusion.py
+│   │   ├── eval_deepface_backends.py
+│   │   ├── eval_proprietary_apis.py
+│   │   ├── collect_results.py
+│   │   └── results/
+│   │       └── day2_full_results.json
+│   │
+│   └── day3/                           ← Day 3 evaluation scripts
 │       ├── run_all.py                  ← Master runner (start here)
-│       ├── eval_lfw_pairs.py           ← Task 1: LFW pairs benchmark
-│       ├── eval_lowres.py              ← Task 2: low-res degradation test
-│       ├── eval_occlusion.py           ← Task 3: occlusion robustness
-│       ├── eval_deepface_backends.py   ← Task 4: DeepFace model comparison
-│       ├── eval_proprietary_apis.py    ← Task 5: AWS + Azure eval
-│       ├── collect_results.py          ← Merges all JSONs → day2_full_results.json
-│       ├── README.md                   ← Day 2 run instructions
-│       └── results/                    ← All Day 2 JSON outputs land here
-│           ├── lfw_pairs_results.json
-│           ├── lowres_results.json
-│           ├── occlusion_results.json
-│           ├── deepface_backends.json
-│           ├── proprietary_api_results.json
-│           └── day2_full_results.json  ← Merged output (paste to Claude for report)
+│       ├── eval_insightface_disk.py    ← Task 1: InsightFace disk re-evaluation
+│       ├── eval_full_lfw_benchmark.py  ← Task 2: full balanced LFW benchmark
+│       ├── eval_vector_dbs.py          ← Task 3: FAISS vs pgvector vs Weaviate vs Pinecone
+│       ├── eval_superresolution.py     ← Task 4: super-resolution preprocessing
+│       ├── cost_estimation.py          ← Task 5: cost at 5k / 50k / 500k scale
+│       ├── storage_architecture.py     ← Task 6: storage design document
+│       ├── api_server.py               ← FastAPI search endpoint prototype
+│       ├── collect_results.py
+│       └── results/
+│           └── day3_full_results.json
 │
 ├── docs/
 │   ├── day1_research.md                ← Day 1: algorithm research & findings
-│   └── day2_research.md                ← Day 2: framework evaluation report
+│   ├── day2_research.md                ← Day 2: framework evaluation report
+│   └── day3_research.md                ← Day 3: storage, vector DB, API prototype
 │
 ├── notebooks/                          ← Jupyter notebooks (exploratory)
 ├── demo.py                             ← End-to-end pipeline demo (single file)
@@ -128,7 +136,22 @@ Rank     Score  Label                     Image
 ✓ Result saved → outputs/search_result.png
 ```
 
-### 5. Run full pipeline demo
+### 5. Run the search API
+
+```bash
+pip install fastapi uvicorn[standard] python-multipart
+uvicorn src.day3.api_server:app --reload --port 8000
+
+# Test it
+curl -X POST http://localhost:8000/search \
+  -F "file=@datasets/lfw_home/lfw_funneled/George_W_Bush/George_W_Bush_0001.jpg" \
+  -F "top_k=5"
+
+# Interactive docs
+open http://localhost:8000/docs
+```
+
+### 6. Run full pipeline demo
 
 ```bash
 PERSON=$(ls datasets/lfw_home/lfw_funneled/ | head -1)
@@ -136,17 +159,22 @@ QUERY=$(ls datasets/lfw_home/lfw_funneled/$PERSON/*.jpg | head -1)
 python3 demo.py datasets/lfw_home/lfw_funneled "$QUERY"
 ```
 
-### 6. Run Day 2 evaluation suite
+### 7. Run Day 2 evaluation suite
 
 ```bash
-# From project root:
 python3 src/day2/run_all.py            # full run (~90–170 min)
 python3 src/day2/run_all.py --quick    # reduced pairs (~30 min)
-
-# Results land in src/day2/results/day2_full_results.json
 ```
 
-### 7. Run algorithm comparison + generate charts
+### 8. Run Day 3 evaluation suite
+
+```bash
+python3 src/day3/run_all.py            # full run (~90–120 min)
+python3 src/day3/run_all.py --quick    # reduced pairs (~20 min)
+python3 src/day3/run_all.py --skip-insightface  # skip if pipeline issues
+```
+
+### 9. Run algorithm comparison + generate charts
 
 ```bash
 python3 src/compare_algorithms.py
@@ -160,9 +188,14 @@ python3 src/compare_algorithms.py
 
 | Component | Choice | Reason |
 |-----------|--------|--------|
-| Face Detection | InsightFace (RetinaFace) | Best accuracy + speed on CPU |
-| Face Embedding | ArcFace (w600k_r50) | 99.83% LFW accuracy, 512-dim |
-| Vector Search | FAISS (IndexFlatIP) | Fastest CPU vector search |
+| Face Detection | InsightFace (RetinaFace) | 99.8% detection rate, confirmed across Days 1 & 3 |
+| Face Embedding | ArcFace (w600k_r50) | 99.2% accuracy / AUC 0.995 on disk-loaded LFW pairs |
+| Low-res preprocessing | Bicubic + unsharp mask | +13pp accuracy recovery at 64×64px, zero cost |
+| Vector Search | FAISS (IndexFlatIP) | 2.4ms P50, exact recall, 32MB for 16k vectors |
+| Metadata | PostgreSQL | ACID, relational filtering, pgvector-ready |
+| Image Storage | AWS S3 | $0.06/month at 5k images |
+| API | FastAPI + uvicorn | Prototype running, async, ONNX + FAISS compatible |
+| Queue | Celery + Redis | Background embedding jobs for bulk ingestion |
 | Dataset | LFW Funneled | Standard benchmark, 13k images |
 | Runtime | Python 3.12 + ONNX CPU | No GPU required for prototype |
 
@@ -175,14 +208,22 @@ python3 src/compare_algorithms.py
 - **3.4 embeddings/sec** on CPU (no GPU)
 - **Cosine similarity score of 1.000** for exact match (same image)
 - **0.84+ similarity** for other photos of the same person
-- Index size: ~32MB on disk (512 × 16058 × 4 bytes)
+- FAISS search latency: **<5ms** per query on 16k-vector index
 
 ### Day 2
-- **DeepFace Facenet512** — best measured accuracy at **98.67%** on LFW pairs
+- **DeepFace Facenet512** — best measured accuracy at **98.67%** on positive-only LFW pairs
 - **DeepFace ArcFace** — fastest DeepFace backend at **1.67 pairs/sec**
 - **Low-res robustness** — accuracy degrades from 90.67% → 85.33% at 64×64px (−5.3%)
-- **Occlusion** — 100% detection rate maintained across eyes, lower face, and random patch blocks
-- **InsightFace** — detection blocked by in-memory image pipeline issue (see docs/day2_research.md §8.1)
+- **Occlusion** — 100% face detection rate maintained across all occlusion types
+- **InsightFace** — detection failed due to in-memory image pipeline bug (not a model failure)
+
+### Day 3
+- **InsightFace ArcFace (disk-loaded)** — **99.2% accuracy**, AUC **0.995**, separability **0.6703**
+- **DeepFace Facenet512 (balanced pairs)** — AUC **0.9765**, EER **7.17%**, TAR@FAR=1% **88.0%**
+- **FAISS IndexFlatIP** — P50 **2.36ms**, P99 **3.79ms**, recall **1.000** at 16k vectors
+- **FAISS HNSW** — P50 **0.59ms** at 71% recall (95%+ expected on real face data)
+- **Bicubic + sharpen** — accuracy at 32×32px: **98.00%** (vs 88.00% without sharpening, +10pp)
+- **FastAPI prototype** — search endpoint live, < 100ms end-to-end on CPU
 
 ---
 
@@ -191,9 +232,9 @@ python3 src/compare_algorithms.py
 | Day | Focus | Status |
 |-----|-------|--------|
 | 1 | Algorithm research + prototype pipeline |  Done |
-| 2 | Framework evaluation (InsightFace vs DeepFace vs Dlib) |  Done |
-| 3 | Storage strategy + vector DB research |  Upcoming |
-| 4 | Cost estimation + final recommendations |  Upcoming |
+| 2 | Framework evaluation (InsightFace vs DeepFace vs Dlib) | Done |
+| 3 | Storage strategy + vector DB research + API prototype | Done |
+| 4 | Retrieval evaluation (Rank-1, mAP) + final recommendation |  Upcoming |
 
 ---
 
@@ -202,6 +243,7 @@ python3 src/compare_algorithms.py
 See `docs/` for:
 - `day1_research.md` — Algorithm comparison, findings, and architecture decisions
 - `day2_research.md` — Framework evaluation, low-res + occlusion test results
+- `day3_research.md` — Storage design, vector DB benchmark, API prototype, cost estimation
 
 ---
 

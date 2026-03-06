@@ -65,7 +65,7 @@ temp/
 models/
 
 # Day 2 evaluation results — generated data, not source code
-src/day2/results/
+results/
 
 # Day 1 generated outputs
 embeddings/
