@@ -25,7 +25,7 @@ face-recognition-research/
 │
 ├── embeddings/
 │   ├── face_index.faiss                ← FAISS vector index (16,058 embeddings)
-│   ├── metadata.pkl                    ← Per-embedding metadata (path, label, bbox)
+│   ├── metadata.pkl                    ← Per-embedding metadata (image_path, label, bbox, face_index)
 │   └── embeddings.npy                  ← Raw embedding matrix (float32)
 │
 ├── outputs/
@@ -56,23 +56,35 @@ face-recognition-research/
 │   │   └── results/
 │   │       └── day2_full_results.json
 │   │
-│   └── day3/                           ← Day 3 evaluation scripts
+│   ├── day3/                           ← Day 3 evaluation scripts
+│   │   ├── run_all.py                  ← Master runner (start here)
+│   │   ├── eval_insightface_disk.py    ← Task 1: InsightFace disk re-evaluation
+│   │   ├── eval_full_lfw_benchmark.py  ← Task 2: full balanced LFW benchmark
+│   │   ├── eval_vector_dbs.py          ← Task 3: FAISS vs pgvector vs Weaviate vs Pinecone
+│   │   ├── eval_superresolution.py     ← Task 4: super-resolution preprocessing
+│   │   ├── cost_estimation.py          ← Task 5: cost at 5k / 50k / 500k scale
+│   │   ├── storage_architecture.py     ← Task 6: storage design document
+│   │   ├── api_server.py               ← FastAPI search endpoint prototype
+│   │   ├── collect_results.py
+│   │   └── results/
+│   │       └── day3_full_results.json
+│   │
+│   └── day4/                           ← Day 4 evaluation scripts
 │       ├── run_all.py                  ← Master runner (start here)
-│       ├── eval_insightface_disk.py    ← Task 1: InsightFace disk re-evaluation
-│       ├── eval_full_lfw_benchmark.py  ← Task 2: full balanced LFW benchmark
-│       ├── eval_vector_dbs.py          ← Task 3: FAISS vs pgvector vs Weaviate vs Pinecone
-│       ├── eval_superresolution.py     ← Task 4: super-resolution preprocessing
-│       ├── cost_estimation.py          ← Task 5: cost at 5k / 50k / 500k scale
-│       ├── storage_architecture.py     ← Task 6: storage design document
-│       ├── api_server.py               ← FastAPI search endpoint prototype
+│       ├── eval_retrieval.py           ← Task 1: Rank-1, mAP, CMC curve
+│       ├── eval_clustering.py          ← Task 2: Face clustering (DBSCAN / MiniBatchKMeans)
+│       ├── eval_final_benchmark.py     ← Task 3: Final head-to-head benchmark
+│       ├── cost_comparison.py          ← Task 4: Cost at 5k / 50k / 500k scale
+│       ├── generate_recommendation.py  ← Task 5: Final recommendation JSON
 │       ├── collect_results.py
 │       └── results/
-│           └── day3_full_results.json
+│           └── day4_full_results.json
 │
 ├── docs/
 │   ├── day1_research.md                ← Day 1: algorithm research & findings
 │   ├── day2_research.md                ← Day 2: framework evaluation report
-│   └── day3_research.md                ← Day 3: storage, vector DB, API prototype
+│   ├── day3_research.md                ← Day 3: storage, vector DB, API prototype
+│   └── day4_research.md                ← Day 4: retrieval, clustering & final recommendation
 │
 ├── notebooks/                          ← Jupyter notebooks (exploratory)
 ├── demo.py                             ← End-to-end pipeline demo (single file)
@@ -174,7 +186,14 @@ python3 src/day3/run_all.py --quick    # reduced pairs (~20 min)
 python3 src/day3/run_all.py --skip-insightface  # skip if pipeline issues
 ```
 
-### 9. Run algorithm comparison + generate charts
+### 9. Run Day 4 evaluation suite
+
+```bash
+python3 src/day4/run_all.py            # full run (~60–90 min)
+python3 src/day4/run_all.py --quick    # reduced pairs (~15 min)
+```
+
+### 10. Run algorithm comparison + generate charts
 
 ```bash
 python3 src/compare_algorithms.py
@@ -188,14 +207,15 @@ python3 src/compare_algorithms.py
 
 | Component | Choice | Reason |
 |-----------|--------|--------|
-| Face Detection | InsightFace (RetinaFace) | 99.8% detection rate, confirmed across Days 1 & 3 |
+| Face Detection | InsightFace (RetinaFace) | 99.8% detection rate, confirmed across Days 1, 3 & 4 |
 | Face Embedding | ArcFace (w600k_r50) | 99.2% accuracy / AUC 0.995 on disk-loaded LFW pairs |
 | Low-res preprocessing | Bicubic + unsharp mask | +13pp accuracy recovery at 64×64px, zero cost |
 | Vector Search | FAISS (IndexFlatIP) | 2.4ms P50, exact recall, 32MB for 16k vectors |
 | Metadata | PostgreSQL | ACID, relational filtering, pgvector-ready |
-| Image Storage | AWS S3 | $0.06/month at 5k images |
+| Image Storage | AWS S3 | $0.31/month at 5k images |
 | API | FastAPI + uvicorn | Prototype running, async, ONNX + FAISS compatible |
 | Queue | Celery + Redis | Background embedding jobs for bulk ingestion |
+| Clustering | DBSCAN (eps=0.4) | NMI 0.989, purity 0.979 |
 | Dataset | LFW Funneled | Standard benchmark, 13k images |
 | Runtime | Python 3.12 + ONNX CPU | No GPU required for prototype |
 
@@ -225,6 +245,13 @@ python3 src/compare_algorithms.py
 - **Bicubic + sharpen** — accuracy at 32×32px: **98.00%** (vs 88.00% without sharpening, +10pp)
 - **FastAPI prototype** — search endpoint live, < 100ms end-to-end on CPU
 
+### Day 4
+- **Retrieval (CMC)** — Rank-2: **68.0%**, Rank-5: **73.5%**, mAP: **0.354** (Rank-1 is 0% because query images are in the index; genuine matches appear at Rank-2)
+- **DBSCAN clustering** — NMI **0.989**, ARI **0.940**, purity **0.979** on 3,000-embedding subset
+- **Final benchmark** — Dlib: **98.1% accuracy**, AUC **0.9976**, EER **2.0%**, TAR@FAR=1% **97.2%**
+- **DeepFace Facenet512** — **93.8% accuracy**, AUC **0.9738**, strong TAR@FAR=0.1% of **84.4%**
+- **Monthly cost** — **$0.31** at 5k images, **$3.06** at 50k, **$30.58** at 500k (self-hosted, FAISS)
+
 ---
 
 ##  Research Roadmap
@@ -232,9 +259,9 @@ python3 src/compare_algorithms.py
 | Day | Focus | Status |
 |-----|-------|--------|
 | 1 | Algorithm research + prototype pipeline |  Done |
-| 2 | Framework evaluation (InsightFace vs DeepFace vs Dlib) | Done |
-| 3 | Storage strategy + vector DB research + API prototype | Done |
-| 4 | Retrieval evaluation (Rank-1, mAP) + final recommendation |  Upcoming |
+| 2 | Framework evaluation (InsightFace vs DeepFace vs Dlib) |  Done |
+| 3 | Storage strategy + vector DB research + API prototype |  Done |
+| 4 | Retrieval evaluation (Rank-1, mAP) + clustering + final recommendation |  Done |
 
 ---
 
@@ -244,6 +271,7 @@ See `docs/` for:
 - `day1_research.md` — Algorithm comparison, findings, and architecture decisions
 - `day2_research.md` — Framework evaluation, low-res + occlusion test results
 - `day3_research.md` — Storage design, vector DB benchmark, API prototype, cost estimation
+- `day4_research.md` — Retrieval evaluation, clustering, final benchmark, recommendation
 
 ---
 
@@ -256,3 +284,20 @@ See `docs/` for:
 - [Official site](http://vis-www.cs.umass.edu/lfw/)
 
 ---
+
+##  Final Recommendation
+
+The recommended production stack is:
+
+```
+Detection:   InsightFace (RetinaFace)
+Embedding:   ArcFace w600k_r50 (512-dim)
+Vector DB:   FAISS IndexFlatIP → HNSW at >100k vectors
+Storage:     AWS S3
+Metadata:    PostgreSQL
+API:         FastAPI + uvicorn
+Queue:       Celery + Redis
+```
+
+Cost: **$0.31/month** at initial scale. Scales to $30.58/month at 500k images.
+No GPU required for the prototype; GPU reduces ingestion time 23× when needed.
